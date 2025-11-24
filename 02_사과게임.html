@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>사과 게임</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Arial', sans-serif;
+        }
+        
+        .game-container {
+            text-align: center;
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 2.5em;
+        }
+        
+        .score-board {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            color: #555;
+        }
+        
+        .score {
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        
+        .selected-sum {
+            font-weight: bold;
+            color: #2196F3;
+        }
+        
+        .game-board {
+            position: relative;
+            display: inline-block;
+            border: 3px solid #333;
+            border-radius: 10px;
+            background: #f5f5f5;
+            padding: 10px;
+        }
+        
+        .apple-grid {
+            display: grid;
+            gap: 8px;
+            grid-template-columns: repeat(9, 1fr);
+        }
+        
+        .apple {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+            user-select: none;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        }
+        
+        .apple:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        
+        .apple.selected {
+            border: 3px solid #FFD700;
+            box-shadow: 0 0 15px rgba(255, 215, 0, 0.8);
+            transform: scale(1.15);
+        }
+        
+        .apple.removed {
+            opacity: 0;
+            transform: scale(0);
+            pointer-events: none;
+        }
+        
+        .apple-1 { background: linear-gradient(135deg, #FF6B6B, #FF8E8E); }
+        .apple-2 { background: linear-gradient(135deg, #FF8C42, #FFA366); }
+        .apple-3 { background: linear-gradient(135deg, #FFD93D, #FFE66D); }
+        .apple-4 { background: linear-gradient(135deg, #6BCB77, #8DD894); }
+        .apple-5 { background: linear-gradient(135deg, #4ECDC4, #7EDDD6); }
+        .apple-6 { background: linear-gradient(135deg, #45B7D1, #6BC5D8); }
+        .apple-7 { background: linear-gradient(135deg, #A8E6CF, #C4F0DC); }
+        .apple-8 { background: linear-gradient(135deg, #FFB6C1, #FFC0CB); }
+        .apple-9 { background: linear-gradient(135deg, #DDA0DD, #E6C3E6); }
+        
+        .instructions {
+            margin-top: 20px;
+            color: #666;
+            font-size: 1em;
+            line-height: 1.6;
+        }
+        
+        .restart-btn {
+            margin-top: 20px;
+            padding: 12px 30px;
+            font-size: 1.1em;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .restart-btn:hover {
+            background: #45a049;
+        }
+        
+        .selection-box {
+            position: absolute;
+            border: 2px dashed #FFD700;
+            background: rgba(255, 215, 0, 0.1);
+            pointer-events: none;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <h1>🍎 사과 게임 🍎</h1>
+        <div class="score-board">
+            <div class="score">점수: <span id="score">0</span></div>
+            <div class="selected-sum">선택 합계: <span id="selectedSum">0</span></div>
+        </div>
+        <div class="game-board">
+            <div class="selection-box" id="selectionBox"></div>
+            <div class="apple-grid" id="appleGrid"></div>
+        </div>
+        <div class="instructions">
+            <p>마우스로 드래그하여 사과를 선택하세요!</p>
+            <p>선택한 사과들의 숫자 합이 <strong>10</strong>이 되면 사과가 사라집니다.</p>
+        </div>
+        <button class="restart-btn" onclick="initGame()">게임 다시 시작</button>
+    </div>
+    
+    <script>
+        const appleGrid = document.getElementById('appleGrid');
+        const scoreElement = document.getElementById('score');
+        const selectedSumElement = document.getElementById('selectedSum');
+        const selectionBox = document.getElementById('selectionBox');
+        
+        let apples = [];
+        let selectedApples = new Set();
+        let score = 0;
+        let isDragging = false;
+        let dragStart = null;
+        let dragEnd = null;
+        
+        // 게임 초기화
+        function initGame() {
+            apples = [];
+            selectedApples.clear();
+            score = 0;
+            scoreElement.textContent = score;
+            selectedSumElement.textContent = 0;
+            appleGrid.innerHTML = '';
+            
+            // 9x9 그리드에 사과 생성 (1-9 숫자 랜덤 배치)
+            const totalApples = 81; // 9x9 = 81개
+            const numbers = [];
+            
+            // 1-9 숫자를 균등하게 배치
+            for (let i = 0; i < totalApples; i++) {
+                numbers.push((i % 9) + 1);
+            }
+            
+            // 숫자 섞기
+            for (let i = numbers.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
+            }
+            
+            // 사과 생성
+            numbers.forEach((num, index) => {
+                const apple = document.createElement('div');
+                apple.className = `apple apple-${num}`;
+                apple.textContent = num;
+                apple.dataset.index = index;
+                apple.dataset.number = num;
+                
+                apples.push({
+                    element: apple,
+                    number: num,
+                    index: index,
+                    row: Math.floor(index / 9),
+                    col: index % 9
+                });
+                
+                appleGrid.appendChild(apple);
+            });
+        }
+        
+        // 사과 위치 계산
+        function getApplePosition(apple) {
+            const rect = apple.element.getBoundingClientRect();
+            const gridRect = appleGrid.getBoundingClientRect();
+            return {
+                x: rect.left - gridRect.left,
+                y: rect.top - gridRect.top,
+                width: rect.width,
+                height: rect.height,
+                centerX: rect.left - gridRect.left + rect.width / 2,
+                centerY: rect.top - gridRect.top + rect.height / 2
+            };
+        }
+        
+        // 선택 박스 내의 사과 찾기
+        function getApplesInSelection() {
+            if (!dragStart || !dragEnd) return [];
+            
+            const gridRect = appleGrid.getBoundingClientRect();
+            const startX = dragStart.x - gridRect.left;
+            const startY = dragStart.y - gridRect.top;
+            const endX = dragEnd.x - gridRect.left;
+            const endY = dragEnd.y - gridRect.top;
+            
+            const minX = Math.min(startX, endX);
+            const maxX = Math.max(startX, endX);
+            const minY = Math.min(startY, endY);
+            const maxY = Math.max(startY, endY);
+            
+            return apples.filter(apple => {
+                const pos = getApplePosition(apple);
+                return pos.centerX >= minX && pos.centerX <= maxX &&
+                       pos.centerY >= minY && pos.centerY <= maxY;
+            });
+        }
+        
+        // 선택된 사과들의 합 계산
+        function calculateSelectedSum() {
+            let sum = 0;
+            selectedApples.forEach(index => {
+                sum += apples[index].number;
+            });
+            return sum;
+        }
+        
+        // 선택 업데이트
+        function updateSelection() {
+            // 모든 선택 해제
+            apples.forEach(apple => {
+                apple.element.classList.remove('selected');
+            });
+            selectedApples.clear();
+            
+            // 드래그 중이면 선택 박스 내의 사과 선택
+            if (isDragging && dragStart && dragEnd) {
+                const selected = getApplesInSelection();
+                selected.forEach(apple => {
+                    apple.element.classList.add('selected');
+                    selectedApples.add(apple.index);
+                });
+                
+                const sum = calculateSelectedSum();
+                selectedSumElement.textContent = sum;
+            } else {
+                selectedSumElement.textContent = 0;
+            }
+        }
+        
+        // 선택 박스 그리기
+        function updateSelectionBox() {
+            if (!isDragging || !dragStart || !dragEnd) {
+                selectionBox.style.display = 'none';
+                return;
+            }
+            
+            const gridRect = appleGrid.getBoundingClientRect();
+            const startX = dragStart.x - gridRect.left;
+            const startY = dragStart.y - gridRect.top;
+            const endX = dragEnd.x - gridRect.left;
+            const endY = dragEnd.y - gridRect.top;
+            
+            const left = Math.min(startX, endX);
+            const top = Math.min(startY, endY);
+            const width = Math.abs(endX - startX);
+            const height = Math.abs(endY - startY);
+            
+            selectionBox.style.display = 'block';
+            selectionBox.style.left = left + 'px';
+            selectionBox.style.top = top + 'px';
+            selectionBox.style.width = width + 'px';
+            selectionBox.style.height = height + 'px';
+        }
+        
+        // 사과 제거
+        function removeSelectedApples() {
+            const sum = calculateSelectedSum();
+            
+            if (sum === 10 && selectedApples.size > 0) {
+                // 선택된 사과 제거 애니메이션
+                selectedApples.forEach(index => {
+                    const apple = apples[index];
+                    apple.element.classList.add('removed');
+                    setTimeout(() => {
+                        apple.element.remove();
+                    }, 300);
+                });
+                
+                // 배열에서 제거
+                const indicesToRemove = Array.from(selectedApples).sort((a, b) => b - a);
+                indicesToRemove.forEach(index => {
+                    apples.splice(index, 1);
+                });
+                
+                // 인덱스 재설정
+                apples.forEach((apple, newIndex) => {
+                    apple.index = newIndex;
+                    apple.element.dataset.index = newIndex;
+                });
+                
+                // 점수 추가
+                score += selectedApples.size * 10;
+                scoreElement.textContent = score;
+                
+                // 선택 초기화
+                selectedApples.clear();
+                selectedSumElement.textContent = 0;
+                
+                // 사과가 모두 제거되면 게임 재시작
+                if (apples.length === 0) {
+                    setTimeout(() => {
+                        alert('축하합니다! 모든 사과를 제거했습니다!');
+                        initGame();
+                    }, 500);
+                }
+            } else if (selectedApples.size > 0) {
+                // 합이 10이 아니면 선택만 해제
+                selectedApples.forEach(index => {
+                    apples[index].element.classList.remove('selected');
+                });
+                selectedApples.clear();
+                selectedSumElement.textContent = 0;
+            }
+        }
+        
+        // 마우스 이벤트
+        appleGrid.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('apple')) {
+                isDragging = true;
+                dragStart = { x: e.clientX, y: e.clientY };
+                dragEnd = { x: e.clientX, y: e.clientY };
+                updateSelectionBox();
+                updateSelection();
+            }
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                dragEnd = { x: e.clientX, y: e.clientY };
+                updateSelectionBox();
+                updateSelection();
+            }
+        });
+        
+        document.addEventListener('mouseup', (e) => {
+            if (isDragging) {
+                isDragging = false;
+                updateSelectionBox();
+                removeSelectedApples();
+            }
+        });
+        
+        // 터치 이벤트 (모바일 지원)
+        let touchStart = null;
+        
+        appleGrid.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const touch = e.touches[0];
+            if (e.target.classList.contains('apple')) {
+                isDragging = true;
+                touchStart = { x: touch.clientX, y: touch.clientY };
+                dragStart = { x: touch.clientX, y: touch.clientY };
+                dragEnd = { x: touch.clientX, y: touch.clientY };
+                updateSelectionBox();
+                updateSelection();
+            }
+        });
+        
+        document.addEventListener('touchmove', (e) => {
+            if (isDragging) {
+                e.preventDefault();
+                const touch = e.touches[0];
+                dragEnd = { x: touch.clientX, y: touch.clientY };
+                updateSelectionBox();
+                updateSelection();
+            }
+        });
+        
+        document.addEventListener('touchend', (e) => {
+            if (isDragging) {
+                e.preventDefault();
+                isDragging = false;
+                updateSelectionBox();
+                removeSelectedApples();
+            }
+        });
+        
+        // 게임 시작
+        initGame();
+    </script>
+</body>
+</html>
